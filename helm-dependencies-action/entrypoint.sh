@@ -141,7 +141,7 @@ function update_dependency {
 
         if [ -z "$has_changelog" ]; then
           echo "[-] Changelog not found"
-          local PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
+          PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
 
           No changelog :("
         else
@@ -151,7 +151,7 @@ function update_dependency {
 
           sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | sed "$ d" > latest_changelog
 
-          local PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
+          PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
 
 
 # CHANGELOG
