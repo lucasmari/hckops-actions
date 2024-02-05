@@ -66,6 +66,7 @@ function create_pr {
   local GIT_BRANCH=$1
   local PR_TITLE=$2
   local PR_MESSAGE=$3
+  local SOURCE_FILE=$4
 
   echo "[*] GIT_BRANCH=${GIT_BRANCH}"
   echo "[*] PR_TITLE=${PR_TITLE}"
@@ -73,7 +74,7 @@ function create_pr {
 
   # must be on a different branch
   git checkout -b $GIT_BRANCH
-  git add .
+  git add $SOURCE_FILE
   git status
 
   # fails without quotes: "quote all values that have spaces"
@@ -171,7 +172,7 @@ $(cat latest_changelog)
         if [[ -n ${GIT_BRANCH_EXISTS} ]]; then
           echo "[-] Pull request already exists"
         else
-          create_pr "${GIT_BRANCH}" "${PR_TITLE}" "${PR_MESSAGE}" 
+          create_pr "${GIT_BRANCH}" "${PR_TITLE}" "${PR_MESSAGE}" "${SOURCE_FILE}"
         fi
       fi
     ;;
