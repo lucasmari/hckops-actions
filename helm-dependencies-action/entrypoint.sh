@@ -122,16 +122,6 @@ function update_dependency {
       local CURRENT_VERSION=$(get_config ${SOURCE_FILE} ${SOURCE_PATH})
       local LATEST_VERSION=$(cat latest | yq '.title')
 
-      echo "Fetching changelog"
-      curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
-
-      FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_VERSION" | cut -d':' -f1)
-      echo "FIRST_HEADING=${FIRST_HEADING}"
-      SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
-      echo "SECOND_HEADING=${SECOND_HEADING}"
-
-      sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | head -n-1 > latest_changelog
-
       echo "[${REPOSITORY_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_VERSION}]"
 
       if [[ ${CURRENT_VERSION} == ${LATEST_VERSION} ]]; then
@@ -141,6 +131,14 @@ function update_dependency {
         echo "[-] Skip pull request"
 
       else
+        echo "Fetching changelog"
+        curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
+
+        FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_VERSION" | cut -d':' -f1)
+        SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
+
+        sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | head -n-1 > latest_changelog
+
         # update version: see formatting issue https://github.com/mikefarah/yq/issues/515
         yq -i  "${SOURCE_PATH} = \"${LATEST_VERSION}\"" ${SOURCE_FILE}
 
