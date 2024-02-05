@@ -134,10 +134,7 @@ function update_dependency {
       echo "Changelog"
       cat changelog | head
 
-      FIRST_HEADING=$(cat changelog | grep -n '^## ' | head -n1 | cut -d: -f1)
-      SECOND_HEADING=$(cat changelog | grep -n '^## ' | tail -n1 | cut -d: -f1)
-      
-      sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | head -n-1 > latest_changelog
+      cat changelog | grep -n '^## ' | head -n2 | cut -d: -f1 | xargs -n2 sh -c 'sed -n "$1,$2p" changelog' sh | head -n-1 > latest_changelog
 
       echo "Latest changelog"
       cat latest_changelog
