@@ -137,7 +137,7 @@ function update_dependency {
         FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_VERSION" | cut -d':' -f1)
         SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
 
-        sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | head -n-1 > latest_changelog
+        sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | sed "$ d" > latest_changelog
 
         # update version: see formatting issue https://github.com/mikefarah/yq/issues/515
         yq -i  "${SOURCE_PATH} = \"${LATEST_VERSION}\"" ${SOURCE_FILE}
