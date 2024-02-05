@@ -144,7 +144,7 @@ function update_dependency {
 
       echo "Fetching values" 
       curl -sSL "https://artifacthub.io/api/v1/packages/$PACKAGE_ID/$LATEST_VERSION/values" > values
-      diff values ${VALUES_FILE} > values_diff
+      diff values "$VALUES_FILE" > values_diff
 
       echo "Values diff"
       cat values_diff
