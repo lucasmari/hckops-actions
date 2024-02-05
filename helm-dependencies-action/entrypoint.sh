@@ -28,7 +28,7 @@ function get_latest_artifacthub {
 
   # fetches latest version from rss feed (xml format)
   curl -sSL "https://artifacthub.io/api/v1/packages/helm/$HELM_NAME/feed/rss" | \
-    yq -p=xml '.rss.channel.item[0]' > latest
+    yq -p=xml '.rss.channel.item[0]'
 }
 
 # global param: <PARAM_GIT_USER_EMAIL>
@@ -117,7 +117,10 @@ function update_dependency {
   case ${REPOSITORY_TYPE} in
     "artifacthub")
       local REPOSITORY_NAME=$(echo ${DEPENDENCY_JSON} | jq -r '.repository.name')
-      get_latest_artifacthub "$REPOSITORY_NAME"
+      get_latest_artifacthub "$REPOSITORY_NAME" > latest
+
+      echo "Latest version"
+      cat latest
 
       local SOURCE_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.source.file')
       local SOURCE_PATH=$(echo ${DEPENDENCY_JSON} | jq -r '.source.path')
@@ -126,11 +129,19 @@ function update_dependency {
       local LATEST_VERSION=$(cat latest | yq '.title')
       local PACKAGE_ID=$(cat latest | yq '.guid' | cut -d'#' -f1)
 
+      echo "Fetching changelog"
       curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" > changelog
       cat changelog | grep -n '^## ' | head -n2 | cut -d: -f1 | xargs -n2 sh -c 'sed -n "$1,$2p" changelog' sh | head -n-1 > latest_changelog
 
+      echo "Changelog"
+      cat latest_changelog
+
+      echo "Fetching values" 
       curl -sSL "https://artifacthub.io/api/v1/packages/$PACKAGE_ID/$LATEST_VERSION/values" > values
       diff values ${VALUES_FILE} > values_diff
+
+      echo "Values diff"
+      cat values_diff
 
       echo "[${REPOSITORY_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_VERSION}]"
 
