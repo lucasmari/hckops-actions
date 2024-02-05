@@ -133,7 +133,9 @@ function update_dependency {
       curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" > changelog
 
       FIRST_HEADING=$(cat changelog | grep -n '^## ' | head -n1 | cut -d':' -f1)
+      echo "FIRST_HEADING=${FIRST_HEADING}"
       SECOND_HEADING=$(cat changelog | grep -n '^## ' | tail -n1 | cut -d':' -f1)
+      echo "SECOND_HEADING=${SECOND_HEADING}"
 
       sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog > latest_changelog
 
