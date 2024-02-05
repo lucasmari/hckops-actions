@@ -119,7 +119,7 @@ function update_dependency {
       local REPOSITORY_NAME=$(echo ${DEPENDENCY_JSON} | jq -r '.repository.name')
       get_latest_artifacthub "$REPOSITORY_NAME" > latest
 
-      echo "Latest version"
+      echo "Latest"
       cat latest
 
       local SOURCE_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.source.file')
@@ -131,9 +131,12 @@ function update_dependency {
 
       echo "Fetching changelog"
       curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" > changelog
+      echo "Changelog"
+      cat changelog | head
+
       cat changelog | grep -n '^## ' | head -n2 | cut -d: -f1 | xargs -n2 sh -c 'sed -n "$1,$2p" changelog' sh | head -n-1 > latest_changelog
 
-      echo "Changelog"
+      echo "Latest changelog"
       cat latest_changelog
 
       echo "Fetching values" 
