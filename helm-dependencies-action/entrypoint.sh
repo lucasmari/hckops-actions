@@ -135,7 +135,7 @@ function update_dependency {
         curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
 
         cat changelog
-        has_changelog=$(grep '## ' changelog)
+        has_changelog=$(cat changelog | grep '##')
 
         echo "has_changelog"
         echo $has_changelog
@@ -144,7 +144,7 @@ function update_dependency {
           echo "[-] Changelog not found"
           PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
 
-          No changelog :("
+No changelog :("
         else
           echo "[-] Changelog found"
           FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_VERSION" | cut -d':' -f1)
