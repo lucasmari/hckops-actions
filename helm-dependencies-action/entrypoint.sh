@@ -27,8 +27,8 @@ function get_latest_artifacthub {
   local HELM_NAME=$1
 
   # fetches latest version from rss feed (xml format)
-  echo $(curl -sSL "https://artifacthub.io/api/v1/packages/helm/$HELM_NAME/feed/rss" | \
-    yq -p=xml --xml-attribute-prefix=+ '.rss.channel.item[0].title')
+  curl -sSL "https://artifacthub.io/api/v1/packages/helm/$HELM_NAME/feed/rss" | \
+    yq -p=xml '.rss.channel.item[0] > latest'
 }
 
 # global param: <PARAM_GIT_USER_EMAIL>
@@ -116,11 +116,21 @@ function update_dependency {
 
   case ${REPOSITORY_TYPE} in
     "artifacthub")
+      get_latest_artifacthub ${REPOSITORY_NAME}
+
       local REPOSITORY_NAME=$(echo ${DEPENDENCY_JSON} | jq -r '.repository.name')
       local SOURCE_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.source.file')
       local SOURCE_PATH=$(echo ${DEPENDENCY_JSON} | jq -r '.source.path')
+      local VALUES_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.values.file')
       local CURRENT_VERSION=$(get_config ${SOURCE_FILE} ${SOURCE_PATH})
-      local LATEST_VERSION=$(get_latest_artifacthub ${REPOSITORY_NAME})
+      local LATEST_VERSION=$(cat latest | yq '.title')
+      local PACKAGE_ID=$(cat latest | yq '.guid' | cut -d'#' -f1)
+
+      curl -sSL "https://artifacthub.io/api/v1/packages/helm/$HELM_NAME/changelog.md" > changelog
+      cat changelog | grep -n '^## ' | head -n2 | cut -d: -f1 | xargs -n2 sh -c 'sed -n "$1,$2p" changelog' sh | head -n-1 > latest_changelog
+
+      curl -sSL "https://artifacthub.io/api/v1/packages/$PACKAGE_ID/$LATEST_VERSION/values" > values
+      diff values ${VALUES_FILE} > values_diff
 
       echo "[${REPOSITORY_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_VERSION}]"
 
@@ -137,7 +147,13 @@ function update_dependency {
         local GIT_BRANCH=$(echo "helm-${REPOSITORY_NAME}-${LATEST_VERSION}" | sed -r 's|[/.]|-|g')
         local DEPENDENCY_NAME=$(basename ${REPOSITORY_NAME})
         local PR_TITLE="Update ${DEPENDENCY_NAME} to ${LATEST_VERSION}"
-        local PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}"
+        local PR_MESSAGE="<<HERE 
+Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
+
+$(cat latest_changelog)
+
+$(cat values_diff)
+"
 
         # returns the hash of the branch if exists or nothing
         # IMPORTANT branches are fetched once during setup
@@ -147,7 +163,7 @@ function update_dependency {
         if [[ -n ${GIT_BRANCH_EXISTS} ]]; then
           echo "[-] Pull request already exists"
         else
-          create_pr "${GIT_BRANCH}" "${PR_TITLE}" "${PR_MESSAGE}"
+          create_pr "${GIT_BRANCH}" "${PR_TITLE}" "${PR_MESSAGE}" 
         fi
       fi
     ;;
