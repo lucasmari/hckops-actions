@@ -142,13 +142,6 @@ function update_dependency {
       echo "Latest changelog"
       cat latest_changelog
 
-      echo "Fetching values" 
-      curl -sSL "https://artifacthub.io/api/v1/packages/$PACKAGE_ID/$LATEST_VERSION/values" > values
-      diff values "$VALUES_FILE" > values_diff
-
-      echo "Values diff"
-      cat values_diff
-
       echo "[${REPOSITORY_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_VERSION}]"
 
       if [[ ${CURRENT_VERSION} == ${LATEST_VERSION} ]]; then
@@ -168,8 +161,6 @@ function update_dependency {
 Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
 
 $(cat latest_changelog)
-
-$(cat values_diff)
 HERE
 "
 
