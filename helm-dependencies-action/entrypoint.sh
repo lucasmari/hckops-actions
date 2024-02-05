@@ -116,9 +116,9 @@ function update_dependency {
 
   case ${REPOSITORY_TYPE} in
     "artifacthub")
-      get_latest_artifacthub ${REPOSITORY_NAME}
-
       local REPOSITORY_NAME=$(echo ${DEPENDENCY_JSON} | jq -r '.repository.name')
+      get_latest_artifacthub "$REPOSITORY_NAME"
+
       local SOURCE_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.source.file')
       local SOURCE_PATH=$(echo ${DEPENDENCY_JSON} | jq -r '.source.path')
       local VALUES_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.values.file')
@@ -153,6 +153,7 @@ Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_N
 $(cat latest_changelog)
 
 $(cat values_diff)
+HERE
 "
 
         # returns the hash of the branch if exists or nothing
