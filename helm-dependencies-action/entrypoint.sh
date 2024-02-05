@@ -112,36 +112,25 @@ function update_dependency {
   local DEPENDENCY_JSON=$1
   local REPOSITORY_TYPE=$(echo ${DEPENDENCY_JSON} | jq -r '.repository.type')
 
-  # debug
-  echo ${DEPENDENCY_JSON} | jq '.'
-
   case ${REPOSITORY_TYPE} in
     "artifacthub")
       local REPOSITORY_NAME=$(echo ${DEPENDENCY_JSON} | jq -r '.repository.name')
       get_latest_artifacthub "$REPOSITORY_NAME" > latest
 
-      echo "Latest"
-      cat latest
-
       local SOURCE_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.source.file')
       local SOURCE_PATH=$(echo ${DEPENDENCY_JSON} | jq -r '.source.path')
-      local VALUES_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.values.file')
       local CURRENT_VERSION=$(get_config ${SOURCE_FILE} ${SOURCE_PATH})
       local LATEST_VERSION=$(cat latest | yq '.title')
-      local PACKAGE_ID=$(cat latest | yq '.guid' | cut -d'#' -f1)
 
       echo "Fetching changelog"
       curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
 
-      FIRST_HEADING=$(cat changelog | grep -n '^## ' | sed -n '1p' | cut -d':' -f1)
+      FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_VERSION" | cut -d':' -f1)
       echo "FIRST_HEADING=${FIRST_HEADING}"
-      SECOND_HEADING=$(cat changelog | grep -n '^## ' | sed -n '2p' | cut -d':' -f1)
+      SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
       echo "SECOND_HEADING=${SECOND_HEADING}"
 
       sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | head -n-1 > latest_changelog
-
-      echo "Latest changelog"
-      cat latest_changelog
 
       echo "[${REPOSITORY_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_VERSION}]"
 
@@ -160,6 +149,9 @@ function update_dependency {
         local PR_TITLE="Update ${DEPENDENCY_NAME} to ${LATEST_VERSION}"
         local PR_MESSAGE="
 Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
+
+
+# CHANGELOG
 
 $(cat latest_changelog)
 "
