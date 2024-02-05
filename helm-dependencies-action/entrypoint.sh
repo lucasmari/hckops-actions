@@ -137,6 +137,7 @@ function update_dependency {
         cat changelog
         has_changelog=$(grep '## ' changelog)
 
+        echo "has_changelog"
         echo $has_changelog
 
         if [ -z "$has_changelog" ]; then
