@@ -131,18 +131,16 @@ function update_dependency {
         echo "[-] Skip pull request"
 
       else
-        # Sometimes it returns nothing, others it returns an empty message
         echo "Fetching changelog"
         curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
 
-        if [[ -s changelog ]]; then
-          has_changelog=$(yq '.message' changelog)
-        else
-          has_changelog=""
-        fi
-        
+        has_changelog=$(grep '## ' changelog)
 
-        if [[ -n $has_changelog ]]; then
+        if [ -z "$has_changelog" ]; then
+          local PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
+
+          No changelog :("
+        else
           FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_VERSION" | cut -d':' -f1)
           SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
 
@@ -153,12 +151,7 @@ function update_dependency {
 
 # CHANGELOG
 
-$(cat latest_changelog)
-"
-        else
-          local PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
-
-          No changelog :("
+$(cat latest_changelog)"
         fi
 
         # update version: see formatting issue https://github.com/mikefarah/yq/issues/515
