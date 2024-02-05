@@ -126,7 +126,7 @@ function update_dependency {
       local LATEST_VERSION=$(cat latest | yq '.title')
       local PACKAGE_ID=$(cat latest | yq '.guid' | cut -d'#' -f1)
 
-      curl -sSL "https://artifacthub.io/api/v1/packages/helm/$HELM_NAME/changelog.md" > changelog
+      curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" > changelog
       cat changelog | grep -n '^## ' | head -n2 | cut -d: -f1 | xargs -n2 sh -c 'sed -n "$1,$2p" changelog' sh | head -n-1 > latest_changelog
 
       curl -sSL "https://artifacthub.io/api/v1/packages/$PACKAGE_ID/$LATEST_VERSION/values" > values
