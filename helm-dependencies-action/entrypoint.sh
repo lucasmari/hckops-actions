@@ -131,13 +131,35 @@ function update_dependency {
         echo "[-] Skip pull request"
 
       else
+        # Sometimes it returns nothing, others it returns an empty message
         echo "Fetching changelog"
         curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
 
-        FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_VERSION" | cut -d':' -f1)
-        SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
+        if [[ -s changelog ]]; then
+          has_changelog=$(yq '.message' changelog)
+        else
+          has_changelog=""
+        fi
+        
 
-        sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | sed "$ d" > latest_changelog
+        if [[ -n $has_changelog ]]; then
+          FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_VERSION" | cut -d':' -f1)
+          SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
+
+          sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | sed "$ d" > latest_changelog
+
+          local PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
+
+
+# CHANGELOG
+
+$(cat latest_changelog)
+"
+        else
+          local PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
+
+          No changelog :("
+        fi
 
         # update version: see formatting issue https://github.com/mikefarah/yq/issues/515
         yq -i  "${SOURCE_PATH} = \"${LATEST_VERSION}\"" ${SOURCE_FILE}
@@ -145,14 +167,7 @@ function update_dependency {
         local GIT_BRANCH=$(echo "helm-${REPOSITORY_NAME}-${LATEST_VERSION}" | sed -r 's|[/.]|-|g')
         local DEPENDENCY_NAME=$(basename ${REPOSITORY_NAME})
         local PR_TITLE="Update ${DEPENDENCY_NAME} to ${LATEST_VERSION}"
-        local PR_MESSAGE="
-Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
-
-
-# CHANGELOG
-
-$(cat latest_changelog)
-"
+        
 
         # returns the hash of the branch if exists or nothing
         # IMPORTANT branches are fetched once during setup
