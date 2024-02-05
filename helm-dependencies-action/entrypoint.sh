@@ -130,14 +130,14 @@ function update_dependency {
       local PACKAGE_ID=$(cat latest | yq '.guid' | cut -d'#' -f1)
 
       echo "Fetching changelog"
-      curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" > changelog
+      curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
 
       FIRST_HEADING=$(cat changelog | grep -n '^## ' | sed -n '1p' | cut -d':' -f1)
       echo "FIRST_HEADING=${FIRST_HEADING}"
       SECOND_HEADING=$(cat changelog | grep -n '^## ' | sed -n '2p' | cut -d':' -f1)
       echo "SECOND_HEADING=${SECOND_HEADING}"
 
-      sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog > latest_changelog
+      sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | head -n-1 > latest_changelog
 
       echo "Latest changelog"
       cat latest_changelog
@@ -157,11 +157,10 @@ function update_dependency {
         local GIT_BRANCH=$(echo "helm-${REPOSITORY_NAME}-${LATEST_VERSION}" | sed -r 's|[/.]|-|g')
         local DEPENDENCY_NAME=$(basename ${REPOSITORY_NAME})
         local PR_TITLE="Update ${DEPENDENCY_NAME} to ${LATEST_VERSION}"
-        local PR_MESSAGE="<<HERE 
+        local PR_MESSAGE="
 Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
 
 $(cat latest_changelog)
-HERE
 "
 
         # returns the hash of the branch if exists or nothing
