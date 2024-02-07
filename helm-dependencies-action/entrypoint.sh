@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -euo pipefail
 
 ##############################
 
@@ -133,12 +134,10 @@ function update_dependency {
         echo "Fetching changelog"
         curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
 
-        yq '.message' changelog 2>result
+        file_type=$(file changelog)
+        echo "[-] file_type=${file_type}"
 
-        echo "result"
-        cat result
-
-        if [ ! -s result ]; then
+        if [[ "$file_type" =~ "JSON" ]]; then
           echo "[-] Changelog not found"
           PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
 
