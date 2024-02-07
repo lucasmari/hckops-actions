@@ -134,10 +134,7 @@ function update_dependency {
         echo "Fetching changelog"
         curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
 
-        file_type=$(file changelog)
-        echo "[-] file_type=${file_type}"
-
-        if [[ "$file_type" =~ "JSON" ]]; then
+        if jq -e . >/dev/null 2>&1 < changelog; then
           echo "[-] Changelog not found"
           PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
 
