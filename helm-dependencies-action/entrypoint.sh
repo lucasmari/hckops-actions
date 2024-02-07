@@ -28,7 +28,7 @@ function get_latest_artifacthub {
 
   # fetches latest version from rss feed (xml format)
   curl -sSL "https://artifacthub.io/api/v1/packages/helm/$HELM_NAME/feed/rss" | \
-    yq -p=xml '.rss.channel.item[0]'
+    yq -p=xml '.rss.channel.item[0].title'
 }
 
 # global param: <PARAM_GIT_USER_EMAIL>
@@ -115,12 +115,10 @@ function update_dependency {
   case ${REPOSITORY_TYPE} in
     "artifacthub")
       local REPOSITORY_NAME=$(echo ${DEPENDENCY_JSON} | jq -r '.repository.name')
-      get_latest_artifacthub "$REPOSITORY_NAME" > latest
-
       local SOURCE_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.source.file')
       local SOURCE_PATH=$(echo ${DEPENDENCY_JSON} | jq -r '.source.path')
       local CURRENT_VERSION=$(get_config ${SOURCE_FILE} ${SOURCE_PATH})
-      local LATEST_VERSION=$(cat latest | yq '.title')
+      local LATEST_VERSION=$(get_latest_artifacthub "$REPOSITORY_NAME")
 
       echo "[${REPOSITORY_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_VERSION}]"
 
