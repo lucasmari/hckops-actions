@@ -141,7 +141,7 @@ function update_dependency {
 
         curl -L -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/$GITHUB_SOURCE_REPOSITORY/releases/tags/$LATEST_CHART_VERSION" -o release
+        "https://api.github.com/repos/$GITHUB_SOURCE_REPOSITORY/releases/tags/v$LATEST_CHART_VERSION" -o release
 
         PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}\n\n"
 
@@ -166,7 +166,7 @@ function update_dependency {
 
       curl -L -H "Accept: application/vnd.github+json" \
       -H "X-GitHub-Api-Version: 2022-11-28" \
-      "https://api.github.com/repos/$GITHUB_SOURCE_REPOSITORY/releases/tags/$LATEST_APP_VERSION" -o release
+      "https://api.github.com/repos/$GITHUB_SOURCE_REPOSITORY/releases/tags/v$LATEST_APP_VERSION" -o release
 
       PR_MESSAGE="${PR_MESSAGE}\n\n# APP CHANGELOG"
       PR_MESSAGE="${PR_MESSAGE}\n\n$(jq -r '.body' release)"
