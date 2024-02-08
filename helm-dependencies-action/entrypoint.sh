@@ -27,8 +27,7 @@ function get_latest_artifacthub {
   local HELM_NAME=$1
 
   # fetches latest version from rss feed (xml format)
-  curl -sSL "https://artifacthub.io/api/v1/packages/helm/$HELM_NAME/feed/rss" | \
-    yq -p=xml '.rss.channel.item[0].title'
+  curl -sSL "https://artifacthub.io/api/v1/packages/helm/$HELM_NAME/summary"
 }
 
 # global param: <PARAM_GIT_USER_EMAIL>
@@ -110,73 +109,91 @@ function create_pr {
 # global param: <PARAM_DRY_RUN>
 function update_dependency {
   local DEPENDENCY_JSON=$1
-  local REPOSITORY_TYPE=$(echo ${DEPENDENCY_JSON} | jq -r '.repository.type')
 
-  case ${REPOSITORY_TYPE} in
-    "artifacthub")
-      local REPOSITORY_NAME=$(echo ${DEPENDENCY_JSON} | jq -r '.repository.name')
-      local SOURCE_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.source.file')
-      local SOURCE_PATH=$(echo ${DEPENDENCY_JSON} | jq -r '.source.path')
-      local CURRENT_VERSION=$(get_config ${SOURCE_FILE} ${SOURCE_PATH})
-      local LATEST_VERSION=$(get_latest_artifacthub "$REPOSITORY_NAME")
+  local PACKAGE_NAME=$(echo ${DEPENDENCY_JSON} | jq -r '.sources[] | select(.name == "artifacthub") | .package')
+  local TARGET_FILE=$(echo ${DEPENDENCY_JSON} | jq -r '.target.file')
+  local TARGET_PATH=$(echo ${DEPENDENCY_JSON} | jq -r '.target.path')
+  local CURRENT_VERSION=$(get_config ${TARGET_FILE} ${TARGET_PATH})
+  local PACKAGE_SUMMARY=$(get_latest_artifacthub "$PACKAGE_NAME")
+  local LATEST_CHART_VERSION=$(echo ${PACKAGE_SUMMARY} | yq -r '.repository.version')
+  local LATEST_APP_VERSION=$(echo ${PACKAGE_SUMMARY} | yq -r '.repository.app_version')
 
-      echo "[${REPOSITORY_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_VERSION}]"
+  echo "[${PACKAGE_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_CHART_VERSION}]"
 
-      if [[ ${CURRENT_VERSION} == ${LATEST_VERSION} ]]; then
-        echo "[-] Dependency is already up to date"
+  if [[ ${CURRENT_VERSION} == ${LATEST_CHART_VERSION} ]]; then
+    echo "[-] Dependency is already up to date"
 
-      elif [[ "${PARAM_DRY_RUN}" == "true" ]]; then
-        echo "[-] Skip pull request"
+  elif [[ "${PARAM_DRY_RUN}" == "true" ]]; then
+    echo "[-] Skip pull request"
 
-      else
-        echo "Fetching changelog"
-        curl -sSL "https://artifacthub.io/api/v1/packages/helm/$REPOSITORY_NAME/changelog.md" -o changelog
+  else
+    echo "Fetching changelog"
+    curl -sSL "https://artifacthub.io/api/v1/packages/helm/$PACKAGE_NAME/changelog.md" -o changelog
 
-        if jq -e . >/dev/null 2>&1 < changelog; then
-          echo "[-] Changelog not found"
-          PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
+    if jq -e . >/dev/null 2>&1 < changelog; then
+      echo "[-] Changelog not found"
+      PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}
 
 No changelog :("
-        else
-          echo "[-] Changelog found"
-          FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_VERSION" | cut -d':' -f1)
-          SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
+    else
+      echo "[-] Changelog found"
+      FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_CHART_VERSION" | cut -d':' -f1)
+      SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
 
-          sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | sed "$ d" > latest_changelog
+      sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | sed "$ d" > latest_changelog
 
-          PR_MESSAGE="Updates [${REPOSITORY_NAME}](https://artifacthub.io/packages/helm/${REPOSITORY_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_VERSION}
+      PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}
 
 
 # CHANGELOG
 
 $(cat latest_changelog)"
-        fi
 
-        # update version: see formatting issue https://github.com/mikefarah/yq/issues/515
-        yq -i  "${SOURCE_PATH} = \"${LATEST_VERSION}\"" ${SOURCE_FILE}
+    fi
 
-        local GIT_BRANCH=$(echo "helm-${REPOSITORY_NAME}-${LATEST_VERSION}" | sed -r 's|[/.]|-|g')
-        local DEPENDENCY_NAME=$(basename ${REPOSITORY_NAME})
-        local PR_TITLE="Update ${DEPENDENCY_NAME} to ${LATEST_VERSION}"
-        
+    github_source=$(echo ${DEPENDENCY_JSON} | jq -r '.sources[] | select(.name == "github")')
 
-        # returns the hash of the branch if exists or nothing
-        # IMPORTANT branches are fetched once during setup
-        local GIT_BRANCH_EXISTS=$(git show-ref ${GIT_BRANCH})
+    if [ -n $github_source ]; then
+      echo "[-] Github source found"
+      GITHUB_REPOSITORY=$(echo $github_source | jq -r '.repository')
+      REPOSITORY_TYPE=$(echo $github_source | jq -r '.type')
 
-        # returns true if the string is not empty
-        if [[ -n ${GIT_BRANCH_EXISTS} ]]; then
-          echo "[-] Pull request already exists"
-        else
-          create_pr "${GIT_BRANCH}" "${PR_TITLE}" "${PR_MESSAGE}" "${SOURCE_FILE}"
-        fi
+      if [[ "${REPOSITORY_TYPE}" == "app" ]]; then
+        echo "[-] App repository found"
+        curl -L -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_APP_VERSION" -o release
+
+        cat release | jq -r '.body' >> PR_MESSAGE
+      else
+        echo "[-] Chart repository found"
+        curl -L -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_CHART_VERSION" -o release
+
+        cat release | jq -r '.body' >> PR_MESSAGE
       fi
-    ;;
-    *)
-      echo "ERROR: invalid repository type"
-      exit 1
-    ;;
-  esac
+    fi
+
+    # update version: see formatting issue https://github.com/mikefarah/yq/issues/515
+    yq -i  "${TARGET_PATH} = \"${LATEST_CHART_VERSION}\"" ${TARGET_FILE}
+
+    local GIT_BRANCH=$(echo "helm-${PACKAGE_NAME}-${LATEST_CHART_VERSION}" | sed -r 's|[/.]|-|g')
+    local DEPENDENCY_NAME=$(basename ${PACKAGE_NAME})
+    local PR_TITLE="Update ${DEPENDENCY_NAME} to ${LATEST_CHART_VERSION}"
+    
+
+    # returns the hash of the branch if exists or nothing
+    # IMPORTANT branches are fetched once during setup
+    local GIT_BRANCH_EXISTS=$(git show-ref ${GIT_BRANCH})
+
+    # returns true if the string is not empty
+    if [[ -n ${GIT_BRANCH_EXISTS} ]]; then
+      echo "[-] Pull request already exists"
+    else
+      create_pr "${GIT_BRANCH}" "${PR_TITLE}" "${PR_MESSAGE}" "${TARGET_FILE}"
+    fi
+  fi
 }
 
 ##############################
