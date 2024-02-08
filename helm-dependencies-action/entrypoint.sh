@@ -115,10 +115,13 @@ function update_dependency {
   local TARGET_PATH=$(echo ${DEPENDENCY_JSON} | jq -r '.target.path')
   local CURRENT_VERSION=$(get_config ${TARGET_FILE} ${TARGET_PATH})
   local PACKAGE_SUMMARY=$(get_latest_artifacthub "$PACKAGE_NAME")
-  local LATEST_CHART_VERSION=$(echo ${PACKAGE_SUMMARY} | yq -r '.repository.version')
-  local LATEST_APP_VERSION=$(echo ${PACKAGE_SUMMARY} | yq -r '.repository.app_version')
+  local LATEST_CHART_VERSION=$(echo ${PACKAGE_SUMMARY} | yq -r '.version')
+  local LATEST_APP_VERSION=$(echo ${PACKAGE_SUMMARY} | yq -r '.app_version')
+  local GITHUB_SOURCE=$(echo ${DEPENDENCY_JSON} | jq -r '.sources[] | select(.name == "github")')
+  local GITHUB_REPOSITORY=$(echo $GITHUB_SOURCE | jq -r '.repository')
+  local REPOSITORY_TYPE=$(echo $GITHUB_SOURCE | jq -r '.type')
 
-  echo "[${PACKAGE_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_CHART_VERSION}]"
+  echo "[Chart ${PACKAGE_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_CHART_VERSION}]"
 
   if [[ ${CURRENT_VERSION} == ${LATEST_CHART_VERSION} ]]; then
     echo "[-] Dependency is already up to date"
@@ -131,10 +134,20 @@ function update_dependency {
     curl -sSL "https://artifacthub.io/api/v1/packages/helm/$PACKAGE_NAME/changelog.md" -o changelog
 
     if jq -e . >/dev/null 2>&1 < changelog; then
-      echo "[-] Changelog not found"
-      PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}
+      echo "[-] Changelog not found in artifacthub"
 
-No changelog :("
+      if [ -n "$GITHUB_SOURCE" ] && [[ "${REPOSITORY_TYPE}" == "chart" ]]; then
+        echo "[-] Github source with chart repository found"
+
+        curl -L -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_CHART_VERSION" -o release
+
+        PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}\n\n"
+
+        echo "# Chart Changelog" >> PR_MESSAGE
+        cat release | jq -r '.body' >> PR_MESSAGE
+      fi
     else
       echo "[-] Changelog found"
       FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_CHART_VERSION" | cut -d':' -f1)
@@ -142,37 +155,23 @@ No changelog :("
 
       sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | sed "$ d" > latest_changelog
 
-      PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}
+      PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}\n\n"
 
-
-# CHANGELOG
-
-$(cat latest_changelog)"
-
+      echo "# CHART CHANGELOG" >> PR_MESSAGE
+      cat latest_changelog >> PR_MESSAGE
     fi
 
-    github_source=$(echo ${DEPENDENCY_JSON} | jq -r '.sources[] | select(.name == "github")')
+    if [ -n "$GITHUB_SOURCE" ] && [[ "${REPOSITORY_TYPE}" == "app" ]]; then
+      echo "[-] Github source with app repository found"
 
-    if [ -n $github_source ]; then
-      echo "[-] Github source found"
-      GITHUB_REPOSITORY=$(echo $github_source | jq -r '.repository')
-      REPOSITORY_TYPE=$(echo $github_source | jq -r '.type')
+      curl -L -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_APP_VERSION" -o release
 
-      if [[ "${REPOSITORY_TYPE}" == "app" ]]; then
-        echo "[-] App repository found"
-        curl -L -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_APP_VERSION" -o release
-
-        cat release | jq -r '.body' >> PR_MESSAGE
-      else
-        echo "[-] Chart repository found"
-        curl -L -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_CHART_VERSION" -o release
-
-        cat release | jq -r '.body' >> PR_MESSAGE
-      fi
+      echo "# APP CHANGELOG" >> PR_MESSAGE
+      cat release | jq -r '.body' >> PR_MESSAGE
+    else
+      echo "[-] Github source not found"
     fi
 
     # update version: see formatting issue https://github.com/mikefarah/yq/issues/515
