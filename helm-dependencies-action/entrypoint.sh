@@ -69,7 +69,7 @@ function create_pr {
 
   echo "[*] GIT_BRANCH=${GIT_BRANCH}"
   echo "[*] PR_TITLE=${PR_TITLE}"
-  echo -e "[*] PR_MESSAGE=${PR_MESSAGE}"
+  # echo -e "[*] PR_MESSAGE=${PR_MESSAGE}"
 
   # must be on a different branch
   git checkout -b $GIT_BRANCH
@@ -141,17 +141,17 @@ function update_dependency {
 
         curl -L -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_CHART_VERSION" -o release
+        "https://api.github.com/repos/$GITHUB_SOURCE_REPOSITORY/releases/tags/$LATEST_CHART_VERSION" -o release
 
         PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}\n\n"
 
-        PR_MESSAGE="${PR_MESSAGE}\n\n# Chart Changelog"
-        PR_MESSAGE="${PR_MESSAGE}\n\n$(cat release | jq -r '.body')"
+        PR_MESSAGE="${PR_MESSAGE}\n\n# CHART CHANGELOG"
+        PR_MESSAGE="${PR_MESSAGE}\n\n$(jq -r '.body' release)"
       fi
     else
       echo "[-] Changelog found"
-      FIRST_HEADING=$(cat changelog | grep -n "^## $LATEST_CHART_VERSION" | cut -d':' -f1)
-      SECOND_HEADING=$(cat changelog | grep -n "^## $CURRENT_VERSION" | cut -d':' -f1)
+      FIRST_HEADING=$(grep -n "^## $LATEST_CHART_VERSION" changelog | cut -d':' -f1)
+      SECOND_HEADING=$(grep -n "^## $CURRENT_VERSION" changelog | cut -d':' -f1)
 
       sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | sed "$ d" > latest_changelog
 
@@ -169,10 +169,12 @@ function update_dependency {
       "https://api.github.com/repos/$GITHUB_SOURCE_REPOSITORY/releases/tags/$LATEST_APP_VERSION" -o release
 
       PR_MESSAGE="${PR_MESSAGE}\n\n# APP CHANGELOG"
-      PR_MESSAGE="${PR_MESSAGE}\n\n$(cat release | jq -r '.body')"
+      PR_MESSAGE="${PR_MESSAGE}\n\n$(jq -r '.body' release)"
     else
-      echo "[-] Github source not found"
+      echo "[-] Github source with app repository not found"
     fi
+
+    PR_MESSAGE=$(echo -e "${PR_MESSAGE}")
 
     # update version: see formatting issue https://github.com/mikefarah/yq/issues/515
     yq -i  "${TARGET_PATH} = \"${LATEST_CHART_VERSION}\"" ${TARGET_FILE}
