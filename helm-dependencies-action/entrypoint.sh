@@ -69,7 +69,7 @@ function create_pr {
 
   echo "[*] GIT_BRANCH=${GIT_BRANCH}"
   echo "[*] PR_TITLE=${PR_TITLE}"
-  echo "[*] PR_MESSAGE=${PR_MESSAGE}"
+  echo -e "[*] PR_MESSAGE=${PR_MESSAGE}"
 
   # must be on a different branch
   git checkout -b $GIT_BRANCH
@@ -118,7 +118,7 @@ function update_dependency {
   local LATEST_CHART_VERSION=$(echo ${PACKAGE_SUMMARY} | yq -r '.version')
   local LATEST_APP_VERSION=$(echo ${PACKAGE_SUMMARY} | yq -r '.app_version')
   local GITHUB_SOURCE=$(echo ${DEPENDENCY_JSON} | jq -r '.sources[] | select(.name == "github")')
-  local GITHUB_REPOSITORY=$(echo $GITHUB_SOURCE | jq -r '.repository')
+  local GITHUB_SOURCE_REPOSITORY=$(echo $GITHUB_SOURCE | jq -r '.repository')
   local REPOSITORY_TYPE=$(echo $GITHUB_SOURCE | jq -r '.type')
 
   echo "[Chart ${PACKAGE_NAME}] CURRENT=[${CURRENT_VERSION}] LATEST=[${LATEST_CHART_VERSION}]"
@@ -145,8 +145,8 @@ function update_dependency {
 
         PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}\n\n"
 
-        echo "# Chart Changelog" >> PR_MESSAGE
-        cat release | jq -r '.body' >> PR_MESSAGE
+        PR_MESSAGE="${PR_MESSAGE}\n\n# Chart Changelog"
+        PR_MESSAGE="${PR_MESSAGE}\n\n$(cat release | jq -r '.body')"
       fi
     else
       echo "[-] Changelog found"
@@ -157,8 +157,8 @@ function update_dependency {
 
       PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}\n\n"
 
-      echo "# CHART CHANGELOG" >> PR_MESSAGE
-      cat latest_changelog >> PR_MESSAGE
+      PR_MESSAGE="${PR_MESSAGE}\n\n# CHART CHANGELOG"
+      PR_MESSAGE="${PR_MESSAGE}\n\n$(cat latest_changelog)"
     fi
 
     if [ -n "$GITHUB_SOURCE" ] && [[ "${REPOSITORY_TYPE}" == "app" ]]; then
@@ -166,10 +166,10 @@ function update_dependency {
 
       curl -L -H "Accept: application/vnd.github+json" \
       -H "X-GitHub-Api-Version: 2022-11-28" \
-      "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_APP_VERSION" -o release
+      "https://api.github.com/repos/$GITHUB_SOURCE_REPOSITORY/releases/tags/$LATEST_APP_VERSION" -o release
 
-      echo "# APP CHANGELOG" >> PR_MESSAGE
-      cat release | jq -r '.body' >> PR_MESSAGE
+      PR_MESSAGE="${PR_MESSAGE}\n\n# APP CHANGELOG"
+      PR_MESSAGE="${PR_MESSAGE}\n\n$(cat release | jq -r '.body')"
     else
       echo "[-] Github source not found"
     fi
