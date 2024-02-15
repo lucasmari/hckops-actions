@@ -133,17 +133,17 @@ function update_dependency {
     echo "Fetching changelog"
     curl -sSL "https://artifacthub.io/api/v1/packages/helm/$PACKAGE_NAME/changelog.md" -o changelog
 
+    PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}\n\n"
+
     if jq -e . >/dev/null 2>&1 < changelog; then
       echo "[-] Changelog not found in artifacthub"
 
       if [ -n "$GITHUB_SOURCE" ] && [[ "${REPOSITORY_TYPE}" == "chart" ]]; then
         echo "[-] Github source with chart repository found"
 
-        curl -L -H "Accept: application/vnd.github+json" \
+        curl -sSL -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "https://api.github.com/repos/$GITHUB_SOURCE_REPOSITORY/releases/tags/v$LATEST_CHART_VERSION" -o release
-
-        PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}\n\n"
 
         PR_MESSAGE="${PR_MESSAGE}\n\n# CHART CHANGELOG"
         PR_MESSAGE="${PR_MESSAGE}\n\n$(jq -r '.body' release)"
@@ -155,8 +155,6 @@ function update_dependency {
 
       sed -n "${FIRST_HEADING},${SECOND_HEADING}p" changelog | sed "$ d" > latest_changelog
 
-      PR_MESSAGE="Updates [${PACKAGE_NAME}](https://artifacthub.io/packages/helm/${PACKAGE_NAME}) Helm dependency from ${CURRENT_VERSION} to ${LATEST_CHART_VERSION}\n\n"
-
       PR_MESSAGE="${PR_MESSAGE}\n\n# CHART CHANGELOG"
       PR_MESSAGE="${PR_MESSAGE}\n\n$(cat latest_changelog)"
     fi
@@ -164,7 +162,7 @@ function update_dependency {
     if [ -n "$GITHUB_SOURCE" ] && [[ "${REPOSITORY_TYPE}" == "app" ]]; then
       echo "[-] Github source with app repository found"
 
-      curl -L -H "Accept: application/vnd.github+json" \
+      curl -sSL -H "Accept: application/vnd.github+json" \
       -H "X-GitHub-Api-Version: 2022-11-28" \
       "https://api.github.com/repos/$GITHUB_SOURCE_REPOSITORY/releases/tags/v$LATEST_APP_VERSION" -o release
 
